@@ -1,0 +1,6 @@
+ssot-aibrain-46e556103f6f.json
+__pycache__/
+*.pyc
+.env
+.DS_Store
+venv/
