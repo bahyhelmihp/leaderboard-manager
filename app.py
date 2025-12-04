@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, firestore
 from dotenv import load_dotenv
@@ -9,6 +10,7 @@ load_dotenv()
 
 # Initialize Flask app
 app = Flask(__name__)
+CORS(app)
 
 # Initialize Firebase Admin SDK
 cred_path = 'ssot-aibrain-46e556103f6f.json'
@@ -52,7 +54,10 @@ def get_leaderboard():
             # Get display name by concatenating firstName and lastName
             first_name = user_data.get('firstName', '')
             last_name = user_data.get('lastName', '')
-            user_name = f"{first_name} {last_name}".strip() or user_id
+            user_name = f"{first_name} {last_name}".strip()
+
+            if not user_name:
+                continue
 
             drill_sessions_ref = users_ref.document(user_id).collection(drill_name)
             sessions = drill_sessions_ref.stream()
@@ -65,12 +70,11 @@ def get_leaderboard():
                 if isinstance(score, (int, float)):
                     total_score += score
 
-            if total_score > 0:
-                leaderboard.append({
-                    'user_id': user_id,
-                    'name': user_name,
-                    'total_score': total_score
-                })
+            leaderboard.append({
+                'user_id': user_id,
+                'name': user_name,
+                'total_score': total_score
+            })
 
         # Sort by total_score in descending order
         leaderboard.sort(key=lambda x: x['total_score'], reverse=True)
@@ -81,4 +85,18 @@ def get_leaderboard():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run()
+    # Configuration for deployment
+    port = int(os.environ.get('PORT', 5004))
+    
+    # Default to local ssl folder if env vars not set
+    cert_file = os.environ.get('SSL_CERT_FILE', 'ssl/fullchain.pem')
+    key_file = os.environ.get('SSL_KEY_FILE', 'ssl/privkey.pem')
+    
+    ssl_context = None
+    if os.path.exists(cert_file) and os.path.exists(key_file):
+        ssl_context = (cert_file, key_file)
+        print(f"Starting with SSL context: {ssl_context}")
+    else:
+        print(f"SSL files not found at {cert_file} and {key_file}. Starting without SSL.")
+    
+    app.run(host='0.0.0.0', port=port, ssl_context=ssl_context)
